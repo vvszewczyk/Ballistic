@@ -1,0 +1,47 @@
+# --- Foldery tymczasowe i generowane przez Unity ---
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+[Mm]emoryCaptures/
+[Rr]ecordings/
+
+# --- Pliki konfiguracyjne IDE i środowiska (generowane automatycznie) ---
+*.csproj
+*.unityproj
+*.sln
+*.slnx
+*.suo
+*.tmp
+*.user
+*.userprefs
+*.pidb
+*.booproj
+*.svd
+*.pdb
+*.mdb
+*.opendb
+*.VC.db
+.vs/
+.gradle/
+ExportedObj/
+.consulo/
+
+# --- Pliki meta dla rzeczy, które ignorujemy ---
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# --- Pliki raportów z awarii ---
+sysinfo.txt
+crashlytics-build.properties
+
+# --- Paczki i buildy ---
+*.apk
+*.aab
+*.unitypackage
+*.app
+*.avatars
