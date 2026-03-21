@@ -12,7 +12,7 @@ GameObject:
   - component: {fileID: 4119130610427657314}
   - component: {fileID: 8700708767410717723}
   - component: {fileID: 7849155421119593377}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: Block
   m_TagString: Untagged
   m_Icon: {fileID: 0}
@@ -164,7 +164,7 @@ GameObject:
   - component: {fileID: 7349142301267108100}
   - component: {fileID: 5608176679846294880}
   - component: {fileID: 1802109327935486023}
-  m_Layer: 0
+  m_Layer: 7
   m_Name: HPText
   m_TagString: Untagged
   m_Icon: {fileID: 0}
