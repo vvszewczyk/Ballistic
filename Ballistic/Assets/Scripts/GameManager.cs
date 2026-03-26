@@ -9,6 +9,8 @@ public class GameManager : MonoBehaviour
     public Ball ballPrefab;
     public Block blockPrefab;
     public Pickup pickupPrefab;
+    public Block triangleBlockPrefab;
+    [Range(0f, 1f)] public float triangleSpawnChance = 0.2f;
 
     [Header("Scene refs")]
     public Transform launcher;
@@ -32,11 +34,42 @@ public class GameManager : MonoBehaviour
     public float minAimY = 0.15f;
 
     [Header("Pickups")]
-    public float pickupSpawnChance = 0.45f;
+    public float pickupSpawnChance = 0.7f;
     public int tempBallPlusAmount = 3;
     public int tempBallMinusAmount = 2;
     public float speedSpellMultiplier = 1.35f;
     public float scatterMaxAngle = 35f;
+
+    [Header("Plus balance")]
+    [SerializeField] private float earlyPlusChance = 1f;
+    [SerializeField] private float midPlusChance = 0.85f;
+    [SerializeField] private float latePlusChance = 0.55f;
+    [SerializeField] private int guaranteedPlusAfterMisses = 2;
+
+    [Header("Effect pickup balance")]
+    [SerializeField] private float midEffectPickupChance = 0.10f;
+    [SerializeField] private float lateEffectPickupChance = 0.20f;
+    [SerializeField] private float bonusEffectPickupChance = 0.35f;
+
+    [Header("Round trigger pickups")]
+    public float bombRadius = 1.35f;
+    public int bombDamage = 1;
+
+    public int clusterHitCount = 5;
+    public int clusterDamage = 1;
+
+    public int sniperHitCount = 2;
+    public int sniperDamage = 1;
+
+    public int crossDamage = 1;
+
+    [Header("Emergency scatter")]
+    public float emergencyScatterLeadDistance = 0.8f;
+    public float emergencyScatterEdgePadding = 0.4f;
+    public float emergencyScatterBottomPadding = 0.8f;
+    public float emergencyScatterTopPadding = 0.4f;
+
+    private int roundsWithoutPlus = 0;
 
     private Camera cam;
     private bool isShooting;
@@ -71,7 +104,7 @@ public class GameManager : MonoBehaviour
 
         UpdateLevelText();
 
-        SpawnInitialRows(2);
+        SpawnInitialRows(1);
     }
 
     private void Update()
@@ -141,6 +174,8 @@ public class GameManager : MonoBehaviour
     {
         launcher.position = new Vector3(firstReturnedX, launcherY, 0f);
 
+        RemoveExpiredPickups();
+
         MoveBlocksDown();
         MovePickupsDown();
 
@@ -194,11 +229,9 @@ public class GameManager : MonoBehaviour
 
         for (int c = 0; c < columns; c++)
         {
-            if (Random.value < 0.55f)
+            if (Random.value < 0.40f)
             {
-                Vector3 pos = new Vector3(GetColumnX(c), topRowY, 0f);
-                Block block = Instantiate(blockPrefab, pos, Quaternion.identity);
-                block.Setup(turn, this);
+                Block block = SpawnBlockAt(c);
                 blocks.Add(block);
                 spawnedAnyBlock = true;
             }
@@ -211,50 +244,44 @@ public class GameManager : MonoBehaviour
         if (!spawnedAnyBlock)
         {
             int forcedColumn = Random.Range(0, columns);
-            Vector3 pos = new Vector3(GetColumnX(forcedColumn), topRowY, 0f);
-
-            Block block = Instantiate(blockPrefab, pos, Quaternion.identity);
-            block.Setup(turn, this);
+            Block block = SpawnBlockAt(forcedColumn);
             blocks.Add(block);
 
             emptyColumns.Remove(forcedColumn);
         }
 
-        if (pickupPrefab != null && emptyColumns.Count > 0 && Random.value < pickupSpawnChance)
+        bool spawnedPlus = false;
+
+        if (pickupPrefab != null && emptyColumns.Count > 0)
         {
-            int pickupColumn = emptyColumns[Random.Range(0, emptyColumns.Count)];
-            Vector3 pickupPos = new Vector3(GetColumnX(pickupColumn), topRowY, 0f);
+            bool shouldSpawnPlus = ShouldSpawnPlus();
+            bool shouldSpawnEffect = ShouldSpawnEffectPickup();
+            bool shouldSpawnAnyPickup = shouldSpawnPlus || shouldSpawnEffect || ShouldSpawnAnyPickup();
+            bool shouldSpawnBonusEffect = shouldSpawnPlus && !shouldSpawnEffect && ShouldSpawnBonusEffectPickup();
 
-            Pickup pickup = Instantiate(pickupPrefab, pickupPos, Quaternion.identity);
-            pickup.Setup(GetRandomPickupType(), this);
-            pickups.Add(pickup);
+            if (shouldSpawnAnyPickup)
+            {
+                PickupType primaryPickupType = GetPrimaryPickupType(shouldSpawnPlus, shouldSpawnEffect, out spawnedPlus);
+
+                SpawnPickupInRandomEmptyColumn(emptyColumns, primaryPickupType);
+
+                if (spawnedPlus && emptyColumns.Count > 0 && (shouldSpawnEffect || shouldSpawnBonusEffect))
+                {
+                    SpawnPickupInRandomEmptyColumn(emptyColumns, GetRandomEffectPickupType());
+                }
+            }
         }
-    }
 
-    private void SpawnPickupAt(int columnIndex)
-    {
-        Vector3 pos = new Vector3(GetColumnX(columnIndex), topRowY, 0f);
-        Pickup pickup = Instantiate(pickupPrefab, pos, Quaternion.identity);
-        pickup.Setup(GetRandomPickupType(), this);
-        pickups.Add(pickup);
-    }
-
-    private PickupType GetRandomPickupType()
-    {
-        int roll = Random.Range(0, 100);
-
-        if (roll < 40) return PickupType.AddBallPermanent; // 40%
-        if (roll < 50) return PickupType.RowBlast;         // 10%
-        if (roll < 60) return PickupType.ColumnBlast;      // 10%
-        if (roll < 70) return PickupType.BallPlusSpell;    // 10%
-        if (roll < 78) return PickupType.BallMinusSpell;   // 8%
-        if (roll < 89) return PickupType.SpeedSpell;       // 11%
-
-        return PickupType.ScatterSpell;                    // 11%
+        if (spawnedPlus)
+            roundsWithoutPlus = 0;
+        else
+            roundsWithoutPlus++;
     }
 
     public void CollectPickup(Pickup pickup, Ball triggeringBall)
     {
+        bool destroyAfterUse = true;
+
         switch (pickup.Type)
         {
             case PickupType.AddBallPermanent:
@@ -263,10 +290,32 @@ public class GameManager : MonoBehaviour
 
             case PickupType.RowBlast:
                 DamageRowAt(pickup.transform.position.y, 1);
+                destroyAfterUse = false;
                 break;
 
             case PickupType.ColumnBlast:
                 DamageColumnAt(pickup.transform.position.x, 1);
+                destroyAfterUse = false;
+                break;
+
+            case PickupType.Bomb:
+                DamageBlocksInRadius(pickup.transform.position, bombRadius, bombDamage);
+                destroyAfterUse = false;
+                break;
+
+            case PickupType.Cluster:
+                DamageRandomBlocks(clusterHitCount, clusterDamage);
+                destroyAfterUse = false;
+                break;
+
+            case PickupType.CrossBlast:
+                DamageCrossAt(pickup.transform.position, crossDamage);
+                destroyAfterUse = false;
+                break;
+
+            case PickupType.Sniper:
+                DamageNearestBlocks(pickup.transform.position, sniperHitCount, sniperDamage);
+                destroyAfterUse = false;
                 break;
 
             case PickupType.BallPlusSpell:
@@ -287,8 +336,11 @@ public class GameManager : MonoBehaviour
                 break;
         }
 
-        pickups.Remove(pickup);
-        Destroy(pickup.gameObject);
+        if (destroyAfterUse)
+        {
+            pickups.Remove(pickup);
+            Destroy(pickup.gameObject);
+        }
     }
 
     private void DamageRowAt(float y, int damage)
@@ -376,16 +428,249 @@ public class GameManager : MonoBehaviour
     }
 
     void SpawnInitialRows(int count)
-{
-    for (int i = 0; i < count; i++)
     {
-        if (i > 0)
+        for (int i = 0; i < count; i++)
         {
-            MoveBlocksDown();
-            MovePickupsDown();
+            if (i > 0)
+            {
+                MoveBlocksDown();
+                MovePickupsDown();
+            }
+
+            SpawnRow();
+        }
+    }
+
+    private int GetTargetBallCount()
+    {
+        return 1 + Mathf.FloorToInt(turn / 2f);
+    }
+
+    private bool ShouldSpawnPlus()
+    {
+        if (turn <= 3)
+            return Random.value < earlyPlusChance;
+
+        if (roundsWithoutPlus >= guaranteedPlusAfterMisses)
+            return true;
+
+        int targetBalls = GetTargetBallCount();
+
+        if (ballCount < targetBalls)
+            return Random.value < 0.9f;
+
+        if (turn <= 8)
+            return Random.value < midPlusChance;
+
+        return Random.value < latePlusChance;
+    }
+
+    private bool ShouldSpawnEffectPickup()
+    {
+        if (turn <= 3)
+            return false;
+
+        if (turn <= 6)
+            return Random.value < midEffectPickupChance;
+
+        return Random.value < lateEffectPickupChance;
+    }
+
+    private bool ShouldSpawnBonusEffectPickup()
+    {
+        if (turn <= 3)
+            return false;
+
+        return Random.value < bonusEffectPickupChance;
+    }
+
+    private bool ShouldSpawnAnyPickup()
+    {
+        return Random.value < pickupSpawnChance;
+    }
+
+    private void SpawnSpecificPickupAt(int columnIndex, PickupType type)
+    {
+        Vector3 pos = new Vector3(GetColumnX(columnIndex), topRowY, 0f);
+        Pickup pickup = Instantiate(pickupPrefab, pos, Quaternion.identity);
+        pickup.Setup(type, this);
+        pickups.Add(pickup);
+    }
+
+    private void SpawnPickupInRandomEmptyColumn(List<int> emptyColumns, PickupType type)
+    {
+        int pickupColumn = emptyColumns[Random.Range(0, emptyColumns.Count)];
+        SpawnSpecificPickupAt(pickupColumn, type);
+        emptyColumns.Remove(pickupColumn);
+    }
+
+    private PickupType GetPrimaryPickupType(bool shouldSpawnPlus, bool shouldSpawnEffect, out bool spawnedPlus)
+    {
+        if (shouldSpawnPlus)
+        {
+            spawnedPlus = true;
+            return PickupType.AddBallPermanent;
         }
 
-        SpawnRow();
+        if (shouldSpawnEffect)
+        {
+            spawnedPlus = false;
+            return GetRandomEffectPickupType();
+        }
+
+        // Honor a successful pickup roll even if the sub-rolls missed.
+        spawnedPlus = true;
+        return PickupType.AddBallPermanent;
     }
-}
+
+    private PickupType GetRandomEffectPickupType()
+    {
+        int roll = Random.Range(0, 100);
+
+        if (roll < 18) return PickupType.RowBlast;
+        if (roll < 36) return PickupType.ColumnBlast;
+        if (roll < 52) return PickupType.Bomb;
+        if (roll < 66) return PickupType.Cluster;
+        if (roll < 78) return PickupType.CrossBlast;
+        if (roll < 88) return PickupType.Sniper;
+        if (roll < 95) return PickupType.SpeedSpell;
+
+        return PickupType.ScatterSpell;
+    }
+
+    private void RemoveExpiredPickups()
+    {
+        for (int i = pickups.Count - 1; i >= 0; i--)
+        {
+            if (pickups[i] == null)
+            {
+                pickups.RemoveAt(i);
+                continue;
+            }
+
+            if (pickups[i].ShouldExpireAtTurnEnd())
+            {
+                Destroy(pickups[i].gameObject);
+                pickups.RemoveAt(i);
+            }
+        }
+    }
+
+    private Block SpawnBlockAt(int columnIndex)
+    {
+        Vector3 pos = new Vector3(GetColumnX(columnIndex), topRowY, 0f);
+
+        bool spawnTriangle = triangleBlockPrefab != null && Random.value < triangleSpawnChance;
+        Debug.Log("spawnTriangle=" + spawnTriangle + " | trianglePrefabNull=" + (triangleBlockPrefab == null));
+
+        Block prefabToSpawn = spawnTriangle ? triangleBlockPrefab : blockPrefab;
+
+        Block block = Instantiate(prefabToSpawn, pos, Quaternion.identity);
+        block.Setup(turn, this);
+
+        if (spawnTriangle)
+        {
+            Debug.Log("Spawned TRIANGLE: " + block.name);
+            int rotationIndex = Random.Range(0, 4);
+            block.SetShapeRotation(rotationIndex);
+        }
+        else
+        {
+            Debug.Log("Spawned SQUARE: " + block.name);
+        }
+
+        return block;
+    }
+
+    private void DamageBlocksInRadius(Vector3 center, float radius, int damage)
+    {
+        List<Block> snapshot = new List<Block>(blocks);
+
+        foreach (Block block in snapshot)
+        {
+            if (block == null) continue;
+
+            float dist = Vector2.Distance(block.transform.position, center);
+            if (dist <= radius)
+            {
+                block.Hit(damage);
+            }
+        }
+    }
+
+    private void DamageRandomBlocks(int count, int damage)
+    {
+        List<Block> candidates = new List<Block>();
+
+        foreach (Block block in blocks)
+        {
+            if (block != null)
+                candidates.Add(block);
+        }
+
+        count = Mathf.Min(count, candidates.Count);
+
+        for (int i = 0; i < count; i++)
+        {
+            int idx = Random.Range(0, candidates.Count);
+            candidates[idx].Hit(damage);
+            candidates.RemoveAt(idx);
+        }
+    }
+
+    private void DamageNearestBlocks(Vector3 center, int count, int damage)
+    {
+        List<Block> candidates = new List<Block>();
+
+        foreach (Block block in blocks)
+        {
+            if (block != null)
+                candidates.Add(block);
+        }
+
+        candidates.Sort((a, b) =>
+        {
+            float da = Vector2.Distance(a.transform.position, center);
+            float db = Vector2.Distance(b.transform.position, center);
+            return da.CompareTo(db);
+        });
+
+        count = Mathf.Min(count, candidates.Count);
+
+        for (int i = 0; i < count; i++)
+        {
+            candidates[i].Hit(damage);
+        }
+    }
+
+    private void DamageCrossAt(Vector3 center, int damage)
+    {
+        DamageRowAt(center.y, damage);
+        DamageColumnAt(center.x, damage);
+    }
+
+    public bool TrySpawnEmergencyScatter(Vector3 ballPosition, Vector2 velocity)
+    {
+        if (pickupPrefab == null) return false;
+        if (velocity.sqrMagnitude < 0.001f) return false;
+
+        Vector2 dir = velocity.normalized;
+        Vector3 spawnPos = ballPosition + (Vector3)(dir * emergencyScatterLeadDistance);
+
+        float minX = -sideLimit + emergencyScatterEdgePadding;
+        float maxX = sideLimit - emergencyScatterEdgePadding;
+
+        float minY = launcherY + emergencyScatterBottomPadding;
+        float maxY = topRowY - emergencyScatterTopPadding;
+
+        spawnPos.x = Mathf.Clamp(spawnPos.x, minX, maxX);
+        spawnPos.y = Mathf.Clamp(spawnPos.y, minY, maxY);
+        spawnPos.z = 0f;
+
+        Pickup pickup = Instantiate(pickupPrefab, spawnPos, Quaternion.identity);
+        pickup.Setup(PickupType.ScatterSpell, this);
+        pickups.Add(pickup);
+
+        return true;
+    }
 }

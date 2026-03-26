@@ -6,6 +6,12 @@ public class Ball : MonoBehaviour
     private GameManager gameManager;
     private bool returned;
 
+    [SerializeField] private float noBlockHitScatterDelay = 1.2f;
+    [SerializeField] private float horizontalVelocityThreshold = 0.35f;
+
+    private float timeSinceLastBlockHit = 0f;
+    private bool emergencyScatterSpawned = false;
+
     private void Awake()
     {
         rb = GetComponent<Rigidbody2D>();
@@ -41,6 +47,23 @@ public class Ball : MonoBehaviour
     {
         if (returned || gameManager == null) return;
 
+        timeSinceLastBlockHit += Time.deltaTime;
+
+        Vector2 velocity = rb.linearVelocity;
+        bool isAlmostHorizontal = Mathf.Abs(velocity.y) < horizontalVelocityThreshold;
+
+        if (!emergencyScatterSpawned &&
+            timeSinceLastBlockHit >= noBlockHitScatterDelay &&
+            isAlmostHorizontal)
+        {
+            bool spawned = gameManager.TrySpawnEmergencyScatter(transform.position, velocity);
+
+            if (spawned)
+            {
+                emergencyScatterSpawned = true;
+            }
+        }
+
         if (transform.position.y < gameManager.LauncherY - 0.5f && rb.linearVelocity.y <= 0f)
         {
             ReturnToManager();
@@ -56,10 +79,13 @@ public class Ball : MonoBehaviour
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
-        Block block = collision.collider.GetComponent<Block>();
+        Block block = collision.collider.GetComponentInParent<Block>();
         if (block != null)
         {
             block.Hit(1);
+
+            timeSinceLastBlockHit = 0f;
+            emergencyScatterSpawned = false;
         }
     }
 }

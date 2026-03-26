@@ -6,6 +6,10 @@ public enum PickupType
     AddBallPermanent,
     RowBlast,
     ColumnBlast,
+    Bomb,
+    Cluster,
+    CrossBlast,
+    Sniper,
     BallPlusSpell,
     BallMinusSpell,
     SpeedSpell,
@@ -19,8 +23,24 @@ public class Pickup : MonoBehaviour
     private PickupType type;
     private GameManager gameManager;
     private bool consumed;
+    private bool activatedThisRound;
 
     public PickupType Type => type;
+
+    public bool IsRoundPersistentTrigger()
+    {
+        return type == PickupType.RowBlast ||
+               type == PickupType.ColumnBlast ||
+               type == PickupType.Bomb ||
+               type == PickupType.Cluster ||
+               type == PickupType.CrossBlast ||
+               type == PickupType.Sniper;
+    }
+
+    public bool ShouldExpireAtTurnEnd()
+    {
+        return IsRoundPersistentTrigger() && activatedThisRound;
+    }
 
     private void Awake()
     {
@@ -37,12 +57,20 @@ public class Pickup : MonoBehaviour
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (consumed) return;
-
         Ball ball = other.GetComponent<Ball>();
         if (ball == null) return;
 
-        consumed = true;
+        if (!IsRoundPersistentTrigger() && consumed) return;
+
+        if (IsRoundPersistentTrigger())
+        {
+            activatedThisRound = true;
+        }
+        else
+        {
+            consumed = true;
+        }
+
         gameManager.CollectPickup(this, ball);
     }
 
@@ -52,27 +80,17 @@ public class Pickup : MonoBehaviour
 
         switch (type)
         {
-            case PickupType.AddBallPermanent:
-                label.text = "+";
-                break;
-            case PickupType.RowBlast:
-                label.text = "<->";
-                break;
-            case PickupType.ColumnBlast:
-                label.text = "|";
-                break;
-            case PickupType.BallPlusSpell:
-                label.text = "B+";
-                break;
-            case PickupType.BallMinusSpell:
-                label.text = "B-";
-                break;
-            case PickupType.SpeedSpell:
-                label.text = "SPD";
-                break;
-            case PickupType.ScatterSpell:
-                label.text = "S";
-                break;
+            case PickupType.AddBallPermanent: label.text = "+"; break;
+            case PickupType.RowBlast:         label.text = "<->"; break;
+            case PickupType.ColumnBlast:      label.text = "|"; break;
+            case PickupType.Bomb:             label.text = "BMB"; break;
+            case PickupType.Cluster:          label.text = "CLU"; break;
+            case PickupType.CrossBlast:       label.text = "+"; break;
+            case PickupType.Sniper:           label.text = "SNP"; break;
+            case PickupType.BallPlusSpell:    label.text = "B+"; break;
+            case PickupType.BallMinusSpell:   label.text = "B-"; break;
+            case PickupType.SpeedSpell:       label.text = "SPD"; break;
+            case PickupType.ScatterSpell:     label.text = "S"; break;
         }
     }
 }

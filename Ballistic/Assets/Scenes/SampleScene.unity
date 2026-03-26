@@ -427,6 +427,8 @@ MonoBehaviour:
   ballPrefab: {fileID: 5470120274533471828, guid: 83c7bde3ec81168faa2fa17706b48372, type: 3}
   blockPrefab: {fileID: 7849155421119593377, guid: aa0a45a84c83a9a839aeb3027e4a72f3, type: 3}
   pickupPrefab: {fileID: -6185841802410109123, guid: 156a6c2062b28c24f901cb8dd5462e23, type: 3}
+  triangleBlockPrefab: {fileID: 987032382989190731, guid: 13c616018fc818637a9b70ea3e7f8e97, type: 3}
+  triangleSpawnChance: 0.3
   launcher: {fileID: 650165940}
   aimLine: {fileID: 650165941}
   levelText: {fileID: 976719822}
@@ -440,11 +442,29 @@ MonoBehaviour:
   ballSpeed: 13
   delayBetweenBalls: 0.06
   minAimY: 0.15
-  pickupSpawnChance: 0.45
+  pickupSpawnChance: 0.7
   tempBallPlusAmount: 3
   tempBallMinusAmount: 2
   speedSpellMultiplier: 1.35
   scatterMaxAngle: 35
+  earlyPlusChance: 1
+  midPlusChance: 1
+  latePlusChance: 0.8
+  guaranteedPlusAfterMisses: 1
+  midEffectPickupChance: 0.7
+  lateEffectPickupChance: 0.7
+  bonusEffectPickupChance: 0.7
+  bombRadius: 1.8
+  bombDamage: 1
+  clusterHitCount: 7
+  clusterDamage: 1
+  sniperHitCount: 3
+  sniperDamage: 1
+  crossDamage: 1
+  emergencyScatterLeadDistance: 0.8
+  emergencyScatterEdgePadding: 0.4
+  emergencyScatterBottomPadding: 0.8
+  emergencyScatterTopPadding: 0.4
 --- !u!4 &404032728
 Transform:
   m_ObjectHideFlags: 0
