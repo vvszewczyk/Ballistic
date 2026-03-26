@@ -169,3 +169,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: cba9d6b68bd5cc5b0a94ba1c8f17e67a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Ball
+  noBlockHitScatterDelay: 1.2
+  horizontalVelocityThreshold: 0.35

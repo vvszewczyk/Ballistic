@@ -15,6 +15,15 @@ public class GameManager : MonoBehaviour
     [Header("Scene refs")]
     public Transform launcher;
     public LineRenderer aimLine;
+    public Transform barrel;
+    public Transform muzzle;
+
+    [Header("Trajectory preview")]
+    public LayerMask trajectoryMask;
+    public int maxPreviewBounces = 4;
+    public float previewMaxDistance = 30f;
+    public float previewStartOffset = 0.15f;
+    public float previewHitOffset = 0.02f;
 
     [Header("UI")]
     public TMP_Text levelText;
@@ -98,8 +107,11 @@ public class GameManager : MonoBehaviour
 
         if (aimLine != null)
         {
-            aimLine.positionCount = 2;
+            aimLine.positionCount = 0;
             aimLine.enabled = true;
+            aimLine.useWorldSpace = true;
+            aimLine.startWidth = 0.05f;
+            aimLine.endWidth = 0.05f;
         }
 
         UpdateLevelText();
@@ -109,9 +121,19 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
-        if (isShooting) return;
+        if (isShooting)
+        {
+            if (aimLine != null)
+                aimLine.enabled = false;
+
+            return;
+        }
+
+        if (aimLine != null)
+            aimLine.enabled = true;
 
         Vector2 dir = GetAimDirection();
+        UpdateBarrelRotation(dir);
         UpdateAimLine(dir);
 
         if (Input.GetMouseButtonUp(0))
@@ -143,7 +165,8 @@ public class GameManager : MonoBehaviour
 
         for (int i = 0; i < currentShotBallCount; i++)
         {
-            Ball ball = Instantiate(ballPrefab, launcher.position, Quaternion.identity);
+            Vector3 spawnPos = GetFireOrigin() + (Vector3)(dir.normalized * 0.1f);
+            Ball ball = Instantiate(ballPrefab, spawnPos, Quaternion.identity);
             ball.Init(this);
             ball.Launch(dir, ballSpeed);
             liveBalls.Add(ball);
@@ -415,8 +438,36 @@ public class GameManager : MonoBehaviour
     {
         if (aimLine == null) return;
 
-        aimLine.SetPosition(0, launcher.position);
-        aimLine.SetPosition(1, launcher.position + (Vector3)(dir * 3f));
+        List<Vector3> points = new List<Vector3>();
+
+        Vector2 origin = (Vector2)GetFireOrigin();
+        Vector2 direction = dir.normalized;
+
+        origin += direction * previewStartOffset;
+        points.Add(GetFireOrigin());
+
+        for (int bounce = 0; bounce < maxPreviewBounces; bounce++)
+        {
+            RaycastHit2D hit = Physics2D.Raycast(origin, direction, previewMaxDistance, trajectoryMask);
+
+            if (hit.collider == null)
+            {
+                points.Add(origin + direction * previewMaxDistance);
+                break;
+            }
+
+            points.Add(hit.point);
+
+            origin = hit.point + hit.normal * previewHitOffset;
+            direction = Vector2.Reflect(direction, hit.normal).normalized;
+        }
+
+        aimLine.positionCount = points.Count;
+
+        for (int i = 0; i < points.Count; i++)
+        {
+            aimLine.SetPosition(i, points[i]);
+        }
     }
 
     private void UpdateLevelText()
@@ -672,5 +723,21 @@ public class GameManager : MonoBehaviour
         pickups.Add(pickup);
 
         return true;
+    }
+
+    private void UpdateBarrelRotation(Vector2 dir)
+    {
+        if (barrel == null) return;
+
+        float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg + 180f;
+        barrel.localRotation = Quaternion.Euler(0f, 0f, angle);
+    }
+
+    private Vector3 GetFireOrigin()
+    {
+        if (muzzle != null)
+            return muzzle.position;
+
+        return launcher.position;
     }
 }
