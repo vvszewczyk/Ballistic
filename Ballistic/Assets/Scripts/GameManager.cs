@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.EventSystems;
 using TMPro;
 
 public class GameManager : MonoBehaviour
@@ -138,6 +139,9 @@ public class GameManager : MonoBehaviour
 
         if (Input.GetMouseButtonUp(0))
         {
+            if (EventSystem.current != null && EventSystem.current.IsPointerOverGameObject())
+                return;
+
             StartCoroutine(FireBalls(dir));
         }
     }
@@ -612,7 +616,7 @@ public class GameManager : MonoBehaviour
         Vector3 pos = new Vector3(GetColumnX(columnIndex), topRowY, 0f);
 
         bool spawnTriangle = triangleBlockPrefab != null && Random.value < triangleSpawnChance;
-        Debug.Log("spawnTriangle=" + spawnTriangle + " | trianglePrefabNull=" + (triangleBlockPrefab == null));
+        //Debug.Log("spawnTriangle=" + spawnTriangle + " | trianglePrefabNull=" + (triangleBlockPrefab == null));
 
         Block prefabToSpawn = spawnTriangle ? triangleBlockPrefab : blockPrefab;
 
@@ -621,13 +625,13 @@ public class GameManager : MonoBehaviour
 
         if (spawnTriangle)
         {
-            Debug.Log("Spawned TRIANGLE: " + block.name);
+            //Debug.Log("Spawned TRIANGLE: " + block.name);
             int rotationIndex = Random.Range(0, 4);
             block.SetShapeRotation(rotationIndex);
         }
         else
         {
-            Debug.Log("Spawned SQUARE: " + block.name);
+            //Debug.Log("Spawned SQUARE: " + block.name);
         }
 
         return block;
