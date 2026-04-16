@@ -18,6 +18,7 @@ public class GameManager : MonoBehaviour
     public LineRenderer aimLine;
     public Transform barrel;
     public Transform muzzle;
+    public Collider2D topWallCollider;
 
     [Header("Trajectory preview")]
     public LayerMask trajectoryMask;
@@ -174,6 +175,11 @@ public class GameManager : MonoBehaviour
 
         for (int i = 0; i < currentShotBallCount; i++)
         {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX(AudioManager.Instance.shootClip, 0.5f);
+            }
+
             Vector3 spawnPos = GetFireOrigin() + (Vector3)(dir.normalized * 0.1f);
             Ball ball = Instantiate(ballPrefab, spawnPos, Quaternion.identity);
             ball.Init(this);
@@ -312,6 +318,11 @@ public class GameManager : MonoBehaviour
 
     public void CollectPickup(Pickup pickup, Ball triggeringBall)
     {
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(AudioManager.Instance.pickupClip, 0.45f);
+        }
+
         bool destroyAfterUse = true;
 
         switch (pickup.Type)
@@ -433,6 +444,11 @@ public class GameManager : MonoBehaviour
         {
             if (block != null && block.transform.position.y <= launcherY + 0.6f)
             {
+                if (AudioManager.Instance != null)
+                {
+                    AudioManager.Instance.PlaySFX(AudioManager.Instance.gameOverClip, 0.7f);
+                }
+
                 Debug.Log("GAME OVER");
 
 #if UNITY_EDITOR
@@ -737,24 +753,61 @@ public class GameManager : MonoBehaviour
         if (pickupPrefab == null) return false;
         if (velocity.sqrMagnitude < 0.001f) return false;
 
-        Vector2 dir = velocity.normalized;
-        Vector3 spawnPos = ballPosition + (Vector3)(dir * emergencyScatterLeadDistance);
+        float horizontalDir = Mathf.Sign(velocity.x);
+        if (Mathf.Abs(horizontalDir) < 0.01f) return false;
+
+        Vector3 spawnPos = ballPosition;
+        spawnPos.x += horizontalDir * emergencyScatterLeadDistance;
+        spawnPos.y = ballPosition.y;
 
         float minX = -sideLimit + emergencyScatterEdgePadding;
         float maxX = sideLimit - emergencyScatterEdgePadding;
-
         float minY = launcherY + emergencyScatterBottomPadding;
-        float maxY = topRowY - emergencyScatterTopPadding;
 
         spawnPos.x = Mathf.Clamp(spawnPos.x, minX, maxX);
-        spawnPos.y = Mathf.Clamp(spawnPos.y, minY, maxY);
+
+        if (topWallCollider != null)
+        {
+            float topLimitY = topWallCollider.bounds.min.y - 0.15f;
+            spawnPos.y = Mathf.Clamp(spawnPos.y, minY, topLimitY);
+        }
+        else
+        {
+            spawnPos.y = Mathf.Max(spawnPos.y, minY);
+        }
+
         spawnPos.z = 0f;
+
+        if (HasNearbyScatterPickup(spawnPos))
+            return false;
 
         Pickup pickup = Instantiate(pickupPrefab, spawnPos, Quaternion.identity);
         pickup.Setup(PickupType.ScatterSpell, this);
         pickups.Add(pickup);
 
         return true;
+    }
+
+    private bool HasNearbyScatterPickup(Vector3 position)
+    {
+        float maxHorizontalDistance = Mathf.Max(0.35f, emergencyScatterLeadDistance * 0.75f);
+        float maxVerticalDistance = Mathf.Max(0.25f, rowStep * 0.5f);
+
+        foreach (Pickup pickup in pickups)
+        {
+            if (pickup == null || pickup.Type != PickupType.ScatterSpell)
+                continue;
+
+            Vector3 pickupPosition = pickup.transform.position;
+
+            if (Mathf.Abs(pickupPosition.x - position.x) <= maxHorizontalDistance &&
+                Mathf.Abs(pickupPosition.y - position.y) <= maxVerticalDistance)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void UpdateBarrelRotation(Vector2 dir)

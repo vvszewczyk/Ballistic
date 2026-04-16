@@ -37,10 +37,31 @@ public class Ball : MonoBehaviour
         Vector2 v = rb.linearVelocity;
         if (v.sqrMagnitude < 0.001f) return;
 
+        float speed = v.magnitude;
         float angle = Random.Range(-maxAngleDeg, maxAngleDeg);
-        Vector2 newDir = Quaternion.Euler(0f, 0f, angle) * v.normalized;
+        Vector2 newDir = (Quaternion.Euler(0f, 0f, angle) * v.normalized).normalized;
 
-        rb.linearVelocity = newDir.normalized * v.magnitude;
+        const float minVertical = 0.35f;
+
+        if (Mathf.Abs(newDir.y) < minVertical)
+        {
+            float ySign;
+
+            if (Mathf.Abs(v.y) < 0.05f)
+            {
+                ySign = transform.position.y > 0f ? -1f : 1f;
+            }
+            else
+            {
+                ySign = Mathf.Sign(newDir.y);
+                if (Mathf.Abs(ySign) < 0.01f)
+                    ySign = Random.value < 0.5f ? -1f : 1f;
+            }
+
+            newDir = new Vector2(newDir.x, ySign * minVertical).normalized;
+        }
+
+        rb.linearVelocity = newDir * speed;
     }
 
     private void Update()

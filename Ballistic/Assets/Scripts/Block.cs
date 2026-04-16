@@ -72,8 +72,18 @@ public class Block : MonoBehaviour
             gameManager.AddScore(appliedDamage);
         }
 
+        if (AudioManager.Instance != null && appliedDamage > 0)
+        {
+            AudioManager.Instance.PlaySFX(AudioManager.Instance.hitClip, 0.25f);
+        }
+
         if (hp <= 0)
         {
+            if (AudioManager.Instance != null)
+            {
+                AudioManager.Instance.PlaySFX(AudioManager.Instance.destroyClip, 0.55f);
+            }
+
             gameManager.NotifyBlockDestroyed(this);
             Destroy(gameObject);
             return;
