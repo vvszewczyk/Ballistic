@@ -9,6 +9,8 @@ public class Block : MonoBehaviour
     [SerializeField] private Color flashColor = Color.white;
     [SerializeField] private float flashDuration = 0.05f;
 
+    [SerializeField] private GameObject hitFxPrefab;
+
     [Header("Triangle text")]
     [SerializeField] private Vector3 triangleTextOffset = new Vector3(-0.12f, -0.12f, 0f);
 
@@ -56,7 +58,19 @@ public class Block : MonoBehaviour
     public void Hit(int damage)
     {
         StartCoroutine(FlashHit());
-        hp -= damage;
+        int appliedDamage = Mathf.Min(damage, hp);
+        hp -= appliedDamage;
+
+        if (hitFxPrefab != null)
+        {
+            GameObject fx = Instantiate(hitFxPrefab, transform.position, Quaternion.identity);
+            Destroy(fx, 0.5f);
+        }
+
+        if (appliedDamage > 0 && gameManager != null)
+        {
+            gameManager.AddScore(appliedDamage);
+        }
 
         if (hp <= 0)
         {

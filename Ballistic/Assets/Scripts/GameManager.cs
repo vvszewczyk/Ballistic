@@ -28,6 +28,8 @@ public class GameManager : MonoBehaviour
 
     [Header("UI")]
     public TMP_Text levelText;
+    public TMP_Text ballCountText;
+    public TMP_Text scoreText;
 
     [Header("Board")]
     public int columns = 7;
@@ -88,6 +90,7 @@ public class GameManager : MonoBehaviour
     private bool gotFirstReturn;
 
     private int turn = 1;
+    private int score = 0;
     private int tempBallDeltaNextShot = 0;
 
     private List<Block> blocks = new List<Block>();
@@ -116,6 +119,8 @@ public class GameManager : MonoBehaviour
         }
 
         UpdateLevelText();
+        UpdateBallCountText();
+        UpdateScoreText();
 
         SpawnInitialRows(1);
     }
@@ -313,6 +318,7 @@ public class GameManager : MonoBehaviour
         {
             case PickupType.AddBallPermanent:
                 ballCount += 1;
+                UpdateBallCountText();
                 break;
 
             case PickupType.RowBlast:
@@ -480,6 +486,28 @@ public class GameManager : MonoBehaviour
         {
             levelText.text = "Level: " + turn;
         }
+    }
+
+    private void UpdateBallCountText()
+    {
+        if (ballCountText != null)
+        {
+            ballCountText.text = "Balls: " + ballCount;
+        }
+    }
+
+    private void UpdateScoreText()
+    {
+        if (scoreText != null)
+        {
+            scoreText.text = "Score: " + score;
+        }
+    }
+
+    public void AddScore(int amount)
+    {
+        score += amount;
+        UpdateScoreText();
     }
 
     void SpawnInitialRows(int count)

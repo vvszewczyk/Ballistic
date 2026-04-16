@@ -48,6 +48,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Block
   hpText: {fileID: 1802109327935486023}
   rotatablePart: {fileID: 5542627584628598326}
+  flashRenderers: []
+  flashColor: {r: 1, g: 1, b: 1, a: 1}
+  flashDuration: 0.05
+  hitFxPrefab: {fileID: 8644882030904033471, guid: dd9cf9be07a93dc2186428fbd0f335df, type: 3}
   triangleTextOffset: {x: 0.25, y: -0.25, z: 0}
 --- !u!1 &2894808685709185629
 GameObject:
