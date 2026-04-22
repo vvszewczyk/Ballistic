@@ -31,6 +31,7 @@ public class GameManager : MonoBehaviour
     public TMP_Text levelText;
     public TMP_Text ballCountText;
     public TMP_Text scoreText;
+    public TMP_Text gameOverText;
 
     [Header("Board")]
     public int columns = 7;
@@ -123,6 +124,11 @@ public class GameManager : MonoBehaviour
         UpdateLevelText();
         UpdateBallCountText();
         UpdateScoreText();
+
+        if (gameOverText != null)
+        {
+            gameOverText.gameObject.SetActive(false);
+        }
 
         SpawnInitialRows(1);
     }
@@ -468,6 +474,11 @@ public class GameManager : MonoBehaviour
         if (AudioManager.Instance != null)
         {
             AudioManager.Instance.PlaySFX(AudioManager.Instance.gameOverClip, 0.7f);
+        }
+
+        if (gameOverText != null)
+        {
+            gameOverText.gameObject.SetActive(true);
         }
 
         Debug.Log("GAME OVER");
