@@ -86,6 +86,7 @@ public class GameManager : MonoBehaviour
 
     private Camera cam;
     private bool isShooting;
+    private bool isGameOver;
     private int activeBalls;
     private float firstReturnedX;
     private bool gotFirstReturn;
@@ -128,7 +129,7 @@ public class GameManager : MonoBehaviour
 
     private void Update()
     {
-        if (isShooting)
+        if (isShooting || isGameOver)
         {
             if (aimLine != null)
                 aimLine.enabled = false;
@@ -165,6 +166,9 @@ public class GameManager : MonoBehaviour
 
     private IEnumerator FireBalls(Vector2 dir)
     {
+        if (isGameOver)
+            yield break;
+
         isShooting = true;
         gotFirstReturn = false;
 
@@ -223,7 +227,8 @@ public class GameManager : MonoBehaviour
         SpawnRow();
         CheckGameOver();
 
-        isShooting = false;
+        if (!isGameOver)
+            isShooting = false;
     }
 
     private void MoveBlocksDown()
@@ -440,24 +445,32 @@ public class GameManager : MonoBehaviour
 
     private void CheckGameOver()
     {
+        if (isGameOver) return;
+
         foreach (Block block in blocks)
         {
             if (block != null && block.transform.position.y <= launcherY + 0.6f)
             {
-                if (AudioManager.Instance != null)
-                {
-                    AudioManager.Instance.PlaySFX(AudioManager.Instance.gameOverClip, 0.7f);
-                }
-
-                Debug.Log("GAME OVER");
-
-#if UNITY_EDITOR
-                UnityEditor.EditorApplication.isPaused = true;
-#endif
-                isShooting = true;
+                StartGameOver();
                 break;
             }
         }
+    }
+
+    private void StartGameOver()
+    {
+        isGameOver = true;
+        isShooting = true;
+
+        if (aimLine != null)
+            aimLine.enabled = false;
+
+        if (AudioManager.Instance != null)
+        {
+            AudioManager.Instance.PlaySFX(AudioManager.Instance.gameOverClip, 0.7f);
+        }
+
+        Debug.Log("GAME OVER");
     }
 
     private void UpdateAimLine(Vector2 dir)
