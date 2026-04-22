@@ -13,6 +13,12 @@ public class GameManager : MonoBehaviour
     public Block triangleBlockPrefab;
     [Range(0f, 1f)] public float triangleSpawnChance = 0.2f;
 
+    [Header("Special block chances")]
+    [Range(0f, 1f)] public float explosiveBlockChance = 0.08f;
+    [Range(0f, 1f)] public float regeneratingBlockChance = 0.06f;
+    [Range(0f, 1f)] public float armoredBlockChance = 0.10f;
+    [SerializeField] private int guaranteedArmoredAfterBlocks = 12;
+
     [Header("Scene refs")]
     public Transform launcher;
     public LineRenderer aimLine;
@@ -95,12 +101,25 @@ public class GameManager : MonoBehaviour
     private int turn = 1;
     private int score = 0;
     private int tempBallDeltaNextShot = 0;
+    private int blocksSinceArmored = 0;
 
     private List<Block> blocks = new List<Block>();
     private List<Ball> liveBalls = new List<Ball>();
     private List<Pickup> pickups = new List<Pickup>();
 
     public float LauncherY => launcherY;
+
+    private void Awake()
+    {
+        EnsureSpecialBlockChances();
+    }
+
+#if UNITY_EDITOR
+    private void OnValidate()
+    {
+        EnsureSpecialBlockChances();
+    }
+#endif
 
     void Start()
     {
@@ -226,6 +245,7 @@ public class GameManager : MonoBehaviour
 
         MoveBlocksDown();
         MovePickupsDown();
+        AdvanceBlocksTurn();
 
         turn++;
         UpdateLevelText();
@@ -267,6 +287,19 @@ public class GameManager : MonoBehaviour
             {
                 Destroy(pickups[i].gameObject);
                 pickups.RemoveAt(i);
+            }
+        }
+    }
+
+    private void AdvanceBlocksTurn()
+    {
+        List<Block> snapshot = new List<Block>(blocks);
+
+        foreach (Block block in snapshot)
+        {
+            if (block != null)
+            {
+                block.OnTurnEnded();
             }
         }
     }
@@ -408,7 +441,7 @@ public class GameManager : MonoBehaviour
 
             if (Mathf.Abs(block.transform.position.y - y) <= rowStep * 0.35f)
             {
-                block.Hit(damage);
+                block.Hit(damage, DamageSource.Row, block.transform.position);
             }
         }
     }
@@ -423,7 +456,7 @@ public class GameManager : MonoBehaviour
 
             if (Mathf.Abs(block.transform.position.x - x) <= columnWidth * 0.35f)
             {
-                block.Hit(damage);
+                block.Hit(damage, DamageSource.Column, block.transform.position);
             }
         }
     }
@@ -612,6 +645,58 @@ public class GameManager : MonoBehaviour
         return Random.value < pickupSpawnChance;
     }
 
+    private void EnsureSpecialBlockChances()
+    {
+        if (explosiveBlockChance <= 0f && regeneratingBlockChance <= 0f && armoredBlockChance <= 0f)
+        {
+            explosiveBlockChance = 0.08f;
+            regeneratingBlockChance = 0.06f;
+            armoredBlockChance = 0.10f;
+            return;
+        }
+
+        if (armoredBlockChance <= 0f)
+            armoredBlockChance = 0.10f;
+    }
+
+    private BlockType GetRandomBlockType()
+    {
+        if (armoredBlockChance > 0f &&
+            guaranteedArmoredAfterBlocks > 0 &&
+            blocksSinceArmored >= guaranteedArmoredAfterBlocks)
+        {
+            blocksSinceArmored = 0;
+            return BlockType.Armored;
+        }
+
+        float roll = Random.value;
+        float threshold = 0f;
+        BlockType blockType = BlockType.Normal;
+
+        threshold += explosiveBlockChance;
+        if (roll < threshold)
+            blockType = BlockType.Explosive;
+        else
+        {
+            threshold += regeneratingBlockChance;
+            if (roll < threshold)
+                blockType = BlockType.Regenerating;
+            else
+            {
+                threshold += armoredBlockChance;
+                if (roll < threshold)
+                    blockType = BlockType.Armored;
+            }
+        }
+
+        if (blockType == BlockType.Armored)
+            blocksSinceArmored = 0;
+        else
+            blocksSinceArmored++;
+
+        return blockType;
+    }
+
     private void SpawnSpecificPickupAt(int columnIndex, PickupType type)
     {
         Vector3 pos = new Vector3(GetColumnX(columnIndex), topRowY, 0f);
@@ -684,39 +769,35 @@ public class GameManager : MonoBehaviour
         Vector3 pos = new Vector3(GetColumnX(columnIndex), topRowY, 0f);
 
         bool spawnTriangle = triangleBlockPrefab != null && Random.value < triangleSpawnChance;
-        //Debug.Log("spawnTriangle=" + spawnTriangle + " | trianglePrefabNull=" + (triangleBlockPrefab == null));
-
         Block prefabToSpawn = spawnTriangle ? triangleBlockPrefab : blockPrefab;
 
         Block block = Instantiate(prefabToSpawn, pos, Quaternion.identity);
-        block.Setup(turn, this);
+
+        BlockType blockType = GetRandomBlockType();
+        block.Setup(turn, this, blockType);
 
         if (spawnTriangle)
         {
-            //Debug.Log("Spawned TRIANGLE: " + block.name);
             int rotationIndex = Random.Range(0, 4);
             block.SetShapeRotation(rotationIndex);
-        }
-        else
-        {
-            //Debug.Log("Spawned SQUARE: " + block.name);
         }
 
         return block;
     }
 
-    private void DamageBlocksInRadius(Vector3 center, float radius, int damage)
+    public void DamageBlocksInRadius(Vector3 center, float radius, int damage, Block sourceToIgnore = null)
     {
         List<Block> snapshot = new List<Block>(blocks);
 
         foreach (Block block in snapshot)
         {
             if (block == null) continue;
+            if (block == sourceToIgnore) continue;
 
             float dist = Vector2.Distance(block.transform.position, center);
             if (dist <= radius)
             {
-                block.Hit(damage);
+                block.Hit(damage, DamageSource.Explosion, block.transform.position);
             }
         }
     }
@@ -731,13 +812,23 @@ public class GameManager : MonoBehaviour
                 candidates.Add(block);
         }
 
-        count = Mathf.Min(count, candidates.Count);
+        int damagedBlocks = 0;
 
-        for (int i = 0; i < count; i++)
+        while (damagedBlocks < count && candidates.Count > 0)
         {
+            candidates.RemoveAll(block => block == null);
+            if (candidates.Count == 0)
+                break;
+
             int idx = Random.Range(0, candidates.Count);
-            candidates[idx].Hit(damage);
+            Block target = candidates[idx];
             candidates.RemoveAt(idx);
+
+            if (target == null)
+                continue;
+
+            target.Hit(damage, DamageSource.Cluster, target.transform.position);
+            damagedBlocks++;
         }
     }
 
@@ -758,11 +849,18 @@ public class GameManager : MonoBehaviour
             return da.CompareTo(db);
         });
 
-        count = Mathf.Min(count, candidates.Count);
+        int damagedBlocks = 0;
 
-        for (int i = 0; i < count; i++)
+        foreach (Block block in candidates)
         {
-            candidates[i].Hit(damage);
+            if (damagedBlocks >= count)
+                break;
+
+            if (block == null)
+                continue;
+
+            block.Hit(damage, DamageSource.Sniper, block.transform.position);
+            damagedBlocks++;
         }
     }
 

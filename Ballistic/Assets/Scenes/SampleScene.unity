@@ -684,6 +684,10 @@ MonoBehaviour:
   pickupPrefab: {fileID: -6185841802410109123, guid: 156a6c2062b28c24f901cb8dd5462e23, type: 3}
   triangleBlockPrefab: {fileID: 987032382989190731, guid: 13c616018fc818637a9b70ea3e7f8e97, type: 3}
   triangleSpawnChance: 0.3
+  explosiveBlockChance: 0.08
+  regeneratingBlockChance: 0.06
+  armoredBlockChance: 0.1
+  guaranteedArmoredAfterBlocks: 12
   launcher: {fileID: 650165940}
   aimLine: {fileID: 650165941}
   barrel: {fileID: 496014232}

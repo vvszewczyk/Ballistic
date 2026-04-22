@@ -154,11 +154,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::Block
   hpText: {fileID: 1802109327935486023}
   rotatablePart: {fileID: 0}
-  flashRenderers: []
+  hitFxPrefab: {fileID: 8644882030904033471, guid: dd9cf9be07a93dc2186428fbd0f335df, type: 3}
+  visualRenderers: []
   flashColor: {r: 1, g: 1, b: 1, a: 1}
   flashDuration: 0.05
-  hitFxPrefab: {fileID: 8644882030904033471, guid: dd9cf9be07a93dc2186428fbd0f335df, type: 3}
+  armoredTextScale: 0.65
+  armoredTriangleTextScale: 0.48
   triangleTextOffset: {x: -0.12, y: -0.12, z: 0}
+  explosiveDamage: 5
+  explosiveRadius: 2
+  regenAmount: 1
+  armoredHitsPerHp: 3
 --- !u!1 &7411987343286457058
 GameObject:
   m_ObjectHideFlags: 0

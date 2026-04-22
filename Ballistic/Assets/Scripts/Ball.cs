@@ -103,7 +103,11 @@ public class Ball : MonoBehaviour
         Block block = collision.collider.GetComponentInParent<Block>();
         if (block != null)
         {
-            block.Hit(1);
+            Vector2 hitPoint = collision.contactCount > 0
+                ? collision.GetContact(0).point
+                : (Vector2)transform.position;
+
+            block.Hit(1, DamageSource.Ball, hitPoint);
 
             timeSinceLastBlockHit = 0f;
             emergencyScatterSpawned = false;
