@@ -17,7 +17,13 @@ public class GameManager : MonoBehaviour
     [Range(0f, 1f)] public float explosiveBlockChance = 0.08f;
     [Range(0f, 1f)] public float regeneratingBlockChance = 0.06f;
     [Range(0f, 1f)] public float armoredBlockChance = 0.10f;
+    [Range(0f, 1f)] public float movingBlockChance = 0.08f;
+    [Range(0f, 1f)] public float splittingBlockChance = 0.06f;
     [SerializeField] private int guaranteedArmoredAfterBlocks = 12;
+
+    [Header("Boss")]
+    [SerializeField] private int bossSpawnInterval = 10;
+    [SerializeField] private float bossHpMultiplier = 4.5f;
 
     [Header("Scene refs")]
     public Transform launcher;
@@ -102,6 +108,9 @@ public class GameManager : MonoBehaviour
     private int score = 0;
     private int tempBallDeltaNextShot = 0;
     private int blocksSinceArmored = 0;
+
+    private const int BossFootprintWidth = 2;
+    private const int BossFootprintHeight = 2;
 
     private List<Block> blocks = new List<Block>();
     private List<Ball> liveBalls = new List<Ball>();
@@ -306,11 +315,15 @@ public class GameManager : MonoBehaviour
 
     private void SpawnRow()
     {
-        bool spawnedAnyBlock = false;
+        bool[] occupiedTopColumns = new bool[columns];
+        bool spawnedAnyBlock = TrySpawnBossForRow(occupiedTopColumns);
         List<int> emptyColumns = new List<int>();
 
         for (int c = 0; c < columns; c++)
         {
+            if (occupiedTopColumns[c])
+                continue;
+
             if (Random.value < 0.40f)
             {
                 Block block = SpawnBlockAt(c);
@@ -325,11 +338,22 @@ public class GameManager : MonoBehaviour
 
         if (!spawnedAnyBlock)
         {
-            int forcedColumn = Random.Range(0, columns);
-            Block block = SpawnBlockAt(forcedColumn);
-            blocks.Add(block);
+            List<int> availableColumns = new List<int>();
 
-            emptyColumns.Remove(forcedColumn);
+            for (int c = 0; c < columns; c++)
+            {
+                if (!occupiedTopColumns[c])
+                    availableColumns.Add(c);
+            }
+
+            if (availableColumns.Count > 0)
+            {
+                int forcedColumn = availableColumns[Random.Range(0, availableColumns.Count)];
+                Block block = SpawnBlockAt(forcedColumn);
+                blocks.Add(block);
+
+                emptyColumns.Remove(forcedColumn);
+            }
         }
 
         bool spawnedPlus = false;
@@ -439,7 +463,7 @@ public class GameManager : MonoBehaviour
         {
             if (block == null) continue;
 
-            if (Mathf.Abs(block.transform.position.y - y) <= rowStep * 0.35f)
+            if (block.OccupiesRow(y))
             {
                 block.Hit(damage, DamageSource.Row, block.transform.position);
             }
@@ -454,7 +478,7 @@ public class GameManager : MonoBehaviour
         {
             if (block == null) continue;
 
-            if (Mathf.Abs(block.transform.position.x - x) <= columnWidth * 0.35f)
+            if (block.OccupiesColumn(x))
             {
                 block.Hit(damage, DamageSource.Column, block.transform.position);
             }
@@ -477,6 +501,98 @@ public class GameManager : MonoBehaviour
         return -((columns - 1) * columnWidth * 0.5f) + (columnIndex * columnWidth);
     }
 
+    private Vector3 GetFootprintCenter(int leftColumnIndex, float topY, int footprintWidth, int footprintHeight)
+    {
+        float x = GetColumnX(leftColumnIndex) + ((footprintWidth - 1) * columnWidth * 0.5f);
+        float y = topY - ((footprintHeight - 1) * rowStep * 0.5f);
+        return new Vector3(x, y, 0f);
+    }
+
+    private Vector2 GetFootprintCellCenter(Vector3 center, int footprintWidth, int footprintHeight, int xIndex, int yIndex)
+    {
+        float xOffset = (xIndex - ((footprintWidth - 1) * 0.5f)) * columnWidth;
+        float yOffset = (((footprintHeight - 1) * 0.5f) - yIndex) * rowStep;
+        return new Vector2(center.x + xOffset, center.y + yOffset);
+    }
+
+    private bool CanPlaceFootprint(Vector3 center, int footprintWidth, int footprintHeight, Block blockToIgnore = null)
+    {
+        footprintWidth = Mathf.Max(1, footprintWidth);
+        footprintHeight = Mathf.Max(1, footprintHeight);
+
+        for (int y = 0; y < footprintHeight; y++)
+        {
+            for (int x = 0; x < footprintWidth; x++)
+            {
+                Vector2 cellCenter = GetFootprintCellCenter(center, footprintWidth, footprintHeight, x, y);
+
+                if (!IsInsideBoardColumn(cellCenter.x))
+                    return false;
+
+                if (IsCellOccupied(cellCenter.x, cellCenter.y, blockToIgnore))
+                    return false;
+            }
+        }
+
+        return true;
+    }
+
+    private bool IsInsideBoardColumn(float x)
+    {
+        float minX = GetColumnX(0);
+        float maxX = GetColumnX(columns - 1);
+        return x >= minX - 0.01f && x <= maxX + 0.01f;
+    }
+
+    private bool IsCellOccupied(float x, float y, Block blockToIgnore = null)
+    {
+        return IsCellOccupiedByBlock(x, y, blockToIgnore) || IsCellOccupiedByPickup(x, y);
+    }
+
+    private bool IsCellOccupiedByBlock(float x, float y, Block blockToIgnore = null)
+    {
+        foreach (Block block in blocks)
+        {
+            if (block == null || block == blockToIgnore) continue;
+
+            if (block.OccupiesCell(x, y))
+                return true;
+        }
+
+        return false;
+    }
+
+    private bool IsCellOccupiedByPickup(float x, float y)
+    {
+        foreach (Pickup pickup in pickups)
+        {
+            if (pickup == null) continue;
+
+            bool sameRow = Mathf.Abs(pickup.transform.position.y - y) <= rowStep * 0.35f;
+            bool sameColumn = Mathf.Abs(pickup.transform.position.x - x) <= columnWidth * 0.35f;
+
+            if (sameRow && sameColumn)
+                return true;
+        }
+
+        return false;
+    }
+
+    public bool TryMoveBlockHorizontally(Block block, int direction)
+    {
+        if (block == null || direction == 0)
+            return false;
+
+        Vector3 targetPosition = block.transform.position;
+        targetPosition.x += Mathf.Sign(direction) * columnWidth;
+
+        if (!CanPlaceFootprint(targetPosition, block.FootprintWidth, block.FootprintHeight, block))
+            return false;
+
+        block.transform.position = targetPosition;
+        return true;
+    }
+
     public void NotifyBlockDestroyed(Block block)
     {
         blocks.Remove(block);
@@ -488,7 +604,7 @@ public class GameManager : MonoBehaviour
 
         foreach (Block block in blocks)
         {
-            if (block != null && block.transform.position.y <= launcherY + 0.6f)
+            if (block != null && block.GetBottomY() <= launcherY + 0.6f)
             {
                 StartGameOver();
                 break;
@@ -647,11 +763,15 @@ public class GameManager : MonoBehaviour
 
     private void EnsureSpecialBlockChances()
     {
-        if (explosiveBlockChance <= 0f && regeneratingBlockChance <= 0f && armoredBlockChance <= 0f)
+        if (explosiveBlockChance <= 0f && regeneratingBlockChance <= 0f &&
+            armoredBlockChance <= 0f && movingBlockChance <= 0f &&
+            splittingBlockChance <= 0f)
         {
             explosiveBlockChance = 0.08f;
             regeneratingBlockChance = 0.06f;
             armoredBlockChance = 0.10f;
+            movingBlockChance = 0.08f;
+            splittingBlockChance = 0.06f;
             return;
         }
 
@@ -686,6 +806,18 @@ public class GameManager : MonoBehaviour
                 threshold += armoredBlockChance;
                 if (roll < threshold)
                     blockType = BlockType.Armored;
+                else
+                {
+                    threshold += movingBlockChance;
+                    if (roll < threshold)
+                        blockType = BlockType.Moving;
+                    else
+                    {
+                        threshold += splittingBlockChance;
+                        if (roll < threshold)
+                            blockType = BlockType.Splitting;
+                    }
+                }
             }
         }
 
@@ -746,6 +878,68 @@ public class GameManager : MonoBehaviour
         return PickupType.ScatterSpell;
     }
 
+    private bool TrySpawnBossForRow(bool[] occupiedTopColumns)
+    {
+        if (!ShouldTrySpawnBoss())
+            return false;
+
+        if (!TryGetBossSpawnColumn(out int leftColumn))
+            return false;
+
+        Block boss = SpawnBossAt(leftColumn);
+        blocks.Add(boss);
+
+        for (int i = 0; i < BossFootprintWidth; i++)
+        {
+            occupiedTopColumns[leftColumn + i] = true;
+        }
+
+        return true;
+    }
+
+    private bool ShouldTrySpawnBoss()
+    {
+        return blockPrefab != null &&
+               columns >= BossFootprintWidth &&
+               bossSpawnInterval > 0 &&
+               turn > 0 &&
+               turn % bossSpawnInterval == 0;
+    }
+
+    private bool TryGetBossSpawnColumn(out int leftColumn)
+    {
+        leftColumn = -1;
+        List<int> candidates = new List<int>();
+
+        for (int c = 0; c <= columns - BossFootprintWidth; c++)
+        {
+            Vector3 center = GetFootprintCenter(c, topRowY, BossFootprintWidth, BossFootprintHeight);
+
+            if (CanPlaceFootprint(center, BossFootprintWidth, BossFootprintHeight))
+                candidates.Add(c);
+        }
+
+        if (candidates.Count == 0)
+            return false;
+
+        leftColumn = candidates[Random.Range(0, candidates.Count)];
+        return true;
+    }
+
+    private Block SpawnBossAt(int leftColumn)
+    {
+        Vector3 pos = GetFootprintCenter(leftColumn, topRowY, BossFootprintWidth, BossFootprintHeight);
+        Block boss = Instantiate(blockPrefab, pos, Quaternion.identity);
+        boss.SetFootprint(BossFootprintWidth, BossFootprintHeight, columnWidth, rowStep);
+        boss.Setup(GetBossHp(), this, BlockType.Boss);
+        return boss;
+    }
+
+    private int GetBossHp()
+    {
+        return Mathf.Max(1, Mathf.RoundToInt(turn * bossHpMultiplier));
+    }
+
     private void RemoveExpiredPickups()
     {
         for (int i = pickups.Count - 1; i >= 0; i--)
@@ -772,6 +966,7 @@ public class GameManager : MonoBehaviour
         Block prefabToSpawn = spawnTriangle ? triangleBlockPrefab : blockPrefab;
 
         Block block = Instantiate(prefabToSpawn, pos, Quaternion.identity);
+        block.SetFootprint(1, 1, columnWidth, rowStep);
 
         BlockType blockType = GetRandomBlockType();
         block.Setup(turn, this, blockType);
