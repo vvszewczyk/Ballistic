@@ -68,6 +68,8 @@ public class Block : MonoBehaviour
     private bool cachedBaseLayout;
     private bool cachedScalablePartLayout;
 
+    private const string OutlineNameMarker = "outline";
+
     public BlockType Type => blockType;
     public int FootprintWidth => footprintWidth;
     public int FootprintHeight => footprintHeight;
@@ -75,7 +77,7 @@ public class Block : MonoBehaviour
     private void Awake()
     {
         if (visualRenderers == null || visualRenderers.Length == 0)
-            visualRenderers = GetComponentsInChildren<SpriteRenderer>(true);
+            visualRenderers = GetTintableRenderers();
 
         CacheBaseLayout();
         CacheBaseColors();
@@ -146,6 +148,7 @@ public class Block : MonoBehaviour
 
         if (rotatablePart != null)
         {
+            AttachOutlinePartsTo(rotatablePart);
             rotatablePart.localRotation = Quaternion.Euler(0f, 0f, angle);
         }
 
@@ -450,6 +453,8 @@ public class Block : MonoBehaviour
             baseScalablePartLocalScale = scalablePart.localScale;
             cachedScalablePartLayout = true;
         }
+
+        AttachOutlinePartsTo(scalablePart);
     }
 
     private Transform CreateRuntimeScalablePart()
@@ -486,6 +491,59 @@ public class Block : MonoBehaviour
         }
 
         return part.transform;
+    }
+
+    private SpriteRenderer[] GetTintableRenderers()
+    {
+        SpriteRenderer[] renderers = GetComponentsInChildren<SpriteRenderer>(true);
+        int tintableCount = 0;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (!IsOutlineTransform(renderers[i].transform))
+                tintableCount++;
+        }
+
+        SpriteRenderer[] tintableRenderers = new SpriteRenderer[tintableCount];
+        int tintableIndex = 0;
+
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            if (!IsOutlineTransform(renderers[i].transform))
+            {
+                tintableRenderers[tintableIndex] = renderers[i];
+                tintableIndex++;
+            }
+        }
+
+        return tintableRenderers;
+    }
+
+    private void AttachOutlinePartsTo(Transform target)
+    {
+        if (target == null)
+            return;
+
+        Transform[] childTransforms = GetComponentsInChildren<Transform>(true);
+
+        for (int i = 0; i < childTransforms.Length; i++)
+        {
+            Transform child = childTransforms[i];
+
+            if (child == null || child == transform || child == target)
+                continue;
+
+            if (!IsOutlineTransform(child) || child.IsChildOf(target))
+                continue;
+
+            child.SetParent(target, true);
+        }
+    }
+
+    private bool IsOutlineTransform(Transform target)
+    {
+        return target != null &&
+               target.name.IndexOf(OutlineNameMarker, System.StringComparison.OrdinalIgnoreCase) >= 0;
     }
 
     private void CopySpriteRenderer(SpriteRenderer source, SpriteRenderer target)

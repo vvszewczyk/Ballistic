@@ -44,6 +44,7 @@ public class GameManager : MonoBehaviour
     public TMP_Text ballCountText;
     public TMP_Text scoreText;
     public TMP_Text gameOverText;
+    public GameOverMenuUI gameOverMenuUI;
 
     [Header("Board")]
     public int columns = 7;
@@ -155,8 +156,11 @@ public class GameManager : MonoBehaviour
 
         if (gameOverText != null)
         {
+            gameOverText.raycastTarget = false;
             gameOverText.gameObject.SetActive(false);
         }
+
+        InitializeGameOverMenu();
 
         SpawnInitialRows(1);
     }
@@ -627,10 +631,38 @@ public class GameManager : MonoBehaviour
 
         if (gameOverText != null)
         {
-            gameOverText.gameObject.SetActive(true);
+            gameOverText.gameObject.SetActive(gameOverMenuUI == null);
+        }
+
+        if (gameOverMenuUI != null)
+        {
+            gameOverMenuUI.Show(score, turn);
         }
 
         Debug.Log("GAME OVER");
+    }
+
+    private void InitializeGameOverMenu()
+    {
+        if (gameOverMenuUI == null)
+        {
+            gameOverMenuUI = FindObjectOfType<GameOverMenuUI>(true);
+        }
+
+        if (gameOverMenuUI == null)
+        {
+            Canvas canvas = FindObjectOfType<Canvas>();
+
+            if (canvas != null)
+            {
+                gameOverMenuUI = canvas.gameObject.AddComponent<GameOverMenuUI>();
+            }
+        }
+
+        if (gameOverMenuUI != null)
+        {
+            gameOverMenuUI.Hide();
+        }
     }
 
     private void UpdateAimLine(Vector2 dir)
