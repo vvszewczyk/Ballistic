@@ -177,10 +177,10 @@ public class MainMenuUI : MonoBehaviour
         }
 
         ConfigureTitle(titleText);
-        ConfigureButton(playButton, "PLAY", new Vector2(0f, 130f));
-        ConfigureButton(leaderboardButton, "LEADERBOARD", new Vector2(0f, 45f));
-        ConfigureButton(infoButton, "INFO", new Vector2(0f, -40f));
-        ConfigureButton(quitButton, "QUIT", new Vector2(0f, -125f));
+        ConfigureButton(playButton, "PLAY", new Vector2(-610f, 260f));
+        ConfigureButton(leaderboardButton, "LEADERBOARD", new Vector2(-610f, 175f));
+        ConfigureButton(infoButton, "INFO", new Vector2(-610f, 90f));
+        ConfigureButton(quitButton, "QUIT", new Vector2(-610f, 5f));
         ConfigurePanel(leaderboardPanel, "LEADERBOARD");
         ConfigurePanel(infoPanel, "INFO");
         ConfigureInfoPanel();
@@ -198,13 +198,13 @@ public class MainMenuUI : MonoBehaviour
         }
 
         titleText.text = "BALLISTIC";
-        titleText.fontSize = 72f;
+        titleText.fontSize = 118f;
         titleText.fontStyle = FontStyles.Bold;
         titleText.alignment = TextAlignmentOptions.Center;
         titleText.raycastTarget = false;
 
         RectTransform rectTransform = titleText.rectTransform;
-        SetRect(rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(0f, 285f), new Vector2(650f, 120f));
+        SetRect(rectTransform, new Vector2(0.5f, 0.5f), new Vector2(0.5f, 0.5f), new Vector2(-585f, 390f), new Vector2(760f, 165f));
     }
 
     private void ConfigureButton(Button button, string label, Vector2 anchoredPosition)
