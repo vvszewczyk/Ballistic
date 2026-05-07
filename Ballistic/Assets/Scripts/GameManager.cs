@@ -45,6 +45,7 @@ public class GameManager : MonoBehaviour
     public TMP_Text scoreText;
     public TMP_Text gameOverText;
     public GameOverMenuUI gameOverMenuUI;
+    public PauseMenuUI pauseMenuUI;
 
     [Header("Board")]
     public int columns = 7;
@@ -101,6 +102,7 @@ public class GameManager : MonoBehaviour
     private Camera cam;
     private bool isShooting;
     private bool isGameOver;
+    private bool isPaused;
     private int activeBalls;
     private float firstReturnedX;
     private bool gotFirstReturn;
@@ -133,6 +135,8 @@ public class GameManager : MonoBehaviour
 
     void Start()
     {
+        Time.timeScale = 1f;
+
         cam = Camera.main;
         launcher.position = new Vector3(0f, launcherY, 0f);
 
@@ -161,13 +165,20 @@ public class GameManager : MonoBehaviour
         }
 
         InitializeGameOverMenu();
+        InitializePauseMenu();
 
         SpawnInitialRows(1);
     }
 
     private void Update()
     {
-        if (isShooting || isGameOver)
+        if (Input.GetKeyDown(KeyCode.Escape))
+        {
+            TogglePause();
+            return;
+        }
+
+        if (isPaused || isShooting || isGameOver)
         {
             if (aimLine != null)
                 aimLine.enabled = false;
@@ -188,6 +199,60 @@ public class GameManager : MonoBehaviour
                 return;
 
             StartCoroutine(FireBalls(dir));
+        }
+    }
+
+    private void OnDestroy()
+    {
+        if (isPaused)
+        {
+            Time.timeScale = 1f;
+        }
+    }
+
+    public void TogglePause()
+    {
+        SetPaused(!isPaused);
+    }
+
+    public void SetPaused(bool paused)
+    {
+        if (isGameOver && paused)
+        {
+            return;
+        }
+
+        isPaused = paused;
+        Time.timeScale = isPaused ? 0f : 1f;
+
+        if (aimLine != null && isPaused)
+        {
+            aimLine.enabled = false;
+        }
+
+        if (pauseMenuUI == null)
+        {
+            return;
+        }
+
+        if (isPaused)
+        {
+            pauseMenuUI.Show();
+        }
+        else
+        {
+            pauseMenuUI.Hide();
+        }
+    }
+
+    private void ClearPause()
+    {
+        isPaused = false;
+        Time.timeScale = 1f;
+
+        if (pauseMenuUI != null)
+        {
+            pauseMenuUI.Hide();
         }
     }
 
@@ -618,6 +683,8 @@ public class GameManager : MonoBehaviour
 
     private void StartGameOver()
     {
+        ClearPause();
+
         isGameOver = true;
         isShooting = true;
 
@@ -662,6 +729,30 @@ public class GameManager : MonoBehaviour
         if (gameOverMenuUI != null)
         {
             gameOverMenuUI.Hide();
+        }
+    }
+
+    private void InitializePauseMenu()
+    {
+        if (pauseMenuUI == null)
+        {
+            pauseMenuUI = FindObjectOfType<PauseMenuUI>(true);
+        }
+
+        if (pauseMenuUI == null)
+        {
+            Canvas canvas = FindObjectOfType<Canvas>();
+
+            if (canvas != null)
+            {
+                pauseMenuUI = canvas.gameObject.AddComponent<PauseMenuUI>();
+            }
+        }
+
+        if (pauseMenuUI != null)
+        {
+            pauseMenuUI.Initialize(this);
+            pauseMenuUI.Hide();
         }
     }
 
